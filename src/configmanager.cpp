@@ -764,6 +764,118 @@ QSettings *ConfigManager::newQSettings()
 	}
 }
 
+QSettings *ConfigManager::readLocalMacros(bool reread)
+{
+	//load config
+	QSettings *config = persistentConfig;
+	if (!config) {
+		config = newQSettings();
+		configFileName = config->fileName();
+		configFileNameBase = configFileName;
+		configBaseDir = ensureTrailingDirSeparator(QFileInfo(configFileName).absolutePath());
+		completerConfig->importedCwlBaseDir = configBaseDir; // set in LatexCompleterConfig to get access from LatexDocument
+		if (configFileNameBase.endsWith(".ini")) configFileNameBase = configFileNameBase.replace(QString(".ini"), "");
+		persistentConfig = config;
+		setupDirectoryStructure();
+		moveCwls();
+	}
+
+	if (QT_VERSION >= QT_VERSION_CHECK(5, 9, 0) && (config->value("version/written_by_Qt_version").toInt()) < QT_VERSION_CHECK(5, 9, 0)) {
+		// workaround for bug 2175: crash when loading some old config that was created with Qt < 5.9 and now reading with Qt 5.9.
+		// Likely a Qt bug because restoreState() should simply.
+		// return false for invalid input. Assuming that some change in the layout of the splitter is incompatible with
+		// a previous state. We don't know exactly what this caused and it's not worth digging into this. Therefore we just
+		// reset this option when loading any old config.
+		config->remove("texmaker/centralVSplitterState");
+	}
+
+	config->beginGroup("texmaker");
+	if (config->contains("Files/Auto Detect Encoding Of Loaded Files")) { // import old setting
+		bool b = config->value("Files/Auto Detect Encoding Of Loaded Files").toBool();
+		if (!config->contains("Files/AutoDetectEncodingFromChars")) config->setValue("Files/AutoDetectEncodingFromChars", b);
+		if (!config->contains("Files/AutoDetectEncodingFromLatex")) config->setValue("Files/AutoDetectEncodingFromLatex", b);
+		config->remove("Files/Auto Detect Encoding Of Loaded Files");
+	}
+
+
+	//import old key replacements or set default
+	QStringList keyReplace, keyReplaceAfterWord, keyReplaceBeforeWord;
+	if (!config->value("User/New Key Replacements Created", false).toBool()) {
+		int keyReplaceCount = config->value("User/KeyReplaceCount", -1).toInt();
+		if (keyReplaceCount == -1) {
+			//default
+			/* new system ...
+			keyReplace.append("\"");
+			QString loc=QString(QLocale::system().name()).left(2);
+			if (loc=="de") {
+			keyReplaceBeforeWord.append("\">");
+			keyReplaceAfterWord.append("\"<");
+			} else {
+			keyReplaceAfterWord.append("''");
+			keyReplaceBeforeWord.append("``");
+			}
+			*/
+		} else for (int i = 0; i < keyReplaceCount; i++) {
+				keyReplace.append(config->value("User/KeyReplace" + QVariant(i).toString(), i != 0 ? "'" : "\"").toString());
+				keyReplaceAfterWord.append(config->value("User/KeyReplaceAfterWord" + QVariant(i).toString(), i != 0 ? "" : "").toString());
+				keyReplaceBeforeWord.append(config->value("User/KeyReplaceBeforeWord" + QVariant(i).toString(), i != 0 ? "" : "\">").toString());
+			}
+	}
+
+	//user macros
+	if (!reread) {
+		if (config->value("Macros/0").isValid()) {
+			for (int i = 0; i < 1000; i++) {
+				QStringList ls = config->value(QString("Macros/%1").arg(i)).toStringList();
+				if (ls.isEmpty()) break;
+				completerConfig->userMacros.append(Macro(ls));
+			}
+			for (int i = 0; i < keyReplace.size(); i++) {
+				completerConfig->userMacros.append(Macro(
+				                                       tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("before word")),
+				                                       keyReplaceBeforeWord[i].replace("%", "%%"),
+				                                       "",
+				                                       "(?language:latex)(?<=\\s|^)" + QRegExp::escape(keyReplace[i])
+				                                   ));
+				completerConfig->userMacros.append(Macro(
+				                                       tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("after word")),
+				                                       keyReplaceAfterWord[i].replace("%", "%%"),
+				                                       "",
+				                                       "(?language:latex)(?<=\\S)" + QRegExp::escape(keyReplace[i])
+				                                   ));
+			}
+		} else {
+			// try importing old macros
+			QStringList userTags = config->value("User/Tags").toStringList();
+			QStringList userNames = config->value("User/TagNames").toStringList();
+			QStringList userAbbrevs = config->value("User/TagAbbrevs").toStringList();
+			QStringList userTriggers = config->value("User/TagTriggers").toStringList();
+
+			while (userTriggers.size() < userTags.size()) userTriggers << "";
+
+			for (int i = 0; i < keyReplace.size(); i++) {
+				userNames.append(tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("before word")));
+				userTags.append(keyReplaceBeforeWord[i].replace("%", "%%"));
+				userAbbrevs.append("");
+				userTriggers.append("(?language:latex)(?<=\\s|^)" + QRegExp::escape(keyReplace[i]));
+
+				userNames.append(tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("after word")));
+				userTags.append(keyReplaceAfterWord[i].replace("%", "%%"));
+				userAbbrevs.append("");
+				userTriggers.append("(?language:latex)(?<=\\S)" + QRegExp::escape(keyReplace[i]));
+			}
+
+			for (int i = 0; i < userTags.size(); i++)
+				completerConfig->userMacros.append(Macro(userNames.value(i, ""), userTags[i], userAbbrevs.value(i, ""), userTriggers.value(i, "")));
+		}
+	}
+
+   	config->endGroup();
+
+	return config;
+
+}
+
 QSettings *ConfigManager::readSettings(bool reread)
 {
 	//load config
@@ -1159,6 +1271,50 @@ QSettings *ConfigManager::readSettings(bool reread)
 	return config;
 }
 
+QSettings *ConfigManager::saveLocalMacros(const QString &saveName)
+{
+
+	Q_ASSERT(persistentConfig);
+	QSettings *config = saveName.isEmpty() ? persistentConfig : (new QSettings(saveName, QSettings::IniFormat));
+
+	config->beginGroup("version");
+	// updated on every access
+	config->setValue("written_by_TXS_version", TXSVERSION);
+    config->setValue("written_by_TXS_hg_revision", TEXSTUDIO_GIT_REVISION);
+	config->setValue("written_by_Qt_version", QT_VERSION);
+	// written just the very first time
+	if (!config->value("created_by_TXS_version").isValid())
+		config->setValue("created_by_TXS_version", TXSVERSION);
+	if (!config->value("created_by_TXS_hg_revision").isValid())
+        config->setValue("created_by_TXS_hg_revision", TEXSTUDIO_GIT_REVISION);
+	if (!config->value("created_by_Qt_version").isValid())
+		config->setValue("created_by_Qt_version", QT_VERSION);
+	config->endGroup();
+
+	config->beginGroup("texmaker");
+
+	buildManager->saveSettings(*config); //save first, so it can set managed properties
+
+    //project specific user macros
+	int index = 0;
+	foreach (const Macro &macro, completerConfig->userMacros) {
+		if (macro.name == TXS_AUTO_REPLACE_QUOTE_OPEN || macro.name == TXS_AUTO_REPLACE_QUOTE_CLOSE || macro.document)
+			continue;
+		config->setValue(QString("Macros/%1").arg(index++), macro.toStringList());
+	}
+	while (config->contains(QString("Macros/%1").arg(index))) { //remove old macros which are not used any more
+		config->remove(QString("Macros/%1").arg(index));
+		index++;
+	}    
+
+	config->endGroup();
+
+	config->sync();
+
+	return config;
+
+}
+
 QSettings *ConfigManager::saveSettings(const QString &saveName)
 {
 	Q_ASSERT(persistentConfig);
@@ -1213,6 +1369,7 @@ QSettings *ConfigManager::saveSettings(const QString &saveName)
 		config->remove(QString("Macros/%1").arg(index));
 		index++;
 	}
+
 	// remove old Tags
 	config->remove("User/Tags");
 	config->remove("User/TagNames");
