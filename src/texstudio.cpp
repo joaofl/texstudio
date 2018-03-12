@@ -3975,6 +3975,9 @@ void Texstudio::readSettings(bool reread)
 	documents.settingsRead();
 
 	configManager.editorConfig->settingsChanged();
+
+
+    configManager.readLocalMacros("/home/joao/my_macros.ini");
 }
 
 void Texstudio::saveSettings(const QString &configName)
@@ -4001,7 +4004,7 @@ void Texstudio::saveSettings(const QString &configName)
 	}
 #endif
 
-	QSettings *config = configManager.saveSettings(configName);
+    QSettings *config = configManager.saveSettings(configName);
 
 	config->beginGroup("texmaker");
 	QList<int> sizes;
@@ -4061,8 +4064,6 @@ void Texstudio::saveSettings(const QString &configName)
 	}
 	config->endGroup();
 
-	config->endGroup();
-
 	config->beginGroup("formats");
 	QFormatFactory defaultFormats(":/qxs/defaultFormats.qxf", this); //load default formats from resource file
 	m_formats->save(*config, &defaultFormats);
@@ -4093,6 +4094,9 @@ void Texstudio::saveSettings(const QString &configName)
 
 	if (asProfile)
 		delete config;
+
+
+    configManager.saveLocalMacros("/home/joao/my_macros.ini");
 }
 
 void Texstudio::restoreDefaultSettings()

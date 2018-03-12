@@ -45,8 +45,8 @@ public:
 	QSettings *readSettings(bool reread = false);
 	QSettings *saveSettings(const QString &saveName = "");
 
-	QSettings *readLocalMacros(bool reread = false);
-	QSettings *saveLocalMacros(const QString &saveName = "");
+    bool readLocalMacros(const QString &readName = "");
+    bool saveLocalMacros(const QString &saveName = "");
 
     bool execConfigDialog(QWidget *parentToDialog);
 
