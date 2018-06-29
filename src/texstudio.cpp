@@ -3977,7 +3977,7 @@ void Texstudio::readSettings(bool reread)
 	configManager.editorConfig->settingsChanged();
 
 
-    configManager.readLocalMacros("/home/joao/my_macros.ini");
+    configManager.readMacros("/home/joao/my_macros.ini");
 }
 
 void Texstudio::saveSettings(const QString &configName)
@@ -4096,7 +4096,7 @@ void Texstudio::saveSettings(const QString &configName)
 		delete config;
 
 
-    configManager.saveLocalMacros("/home/joao/my_macros.ini");
+    configManager.saveMacros("/home/joao/my_macros.ini");
 }
 
 void Texstudio::restoreDefaultSettings()

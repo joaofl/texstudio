@@ -764,7 +764,12 @@ QSettings *ConfigManager::newQSettings()
 	}
 }
 
-bool ConfigManager::readLocalMacros(const QString &readName)
+bool ConfigManager::convertMacros(const QString &in, const QString &out){
+
+    return 1;
+}
+
+bool ConfigManager::readMacros(const QString &readName)
 {
 	//load config
     QSettings *config_local = new QSettings(readName, QSettings::IniFormat);;
@@ -858,7 +863,7 @@ bool ConfigManager::readLocalMacros(const QString &readName)
 
 }
 
-bool ConfigManager::saveLocalMacros(const QString &saveName)
+bool ConfigManager::saveMacros(const QString &saveName)
 {
 
 //	Q_ASSERT(persistentConfig);
@@ -1118,60 +1123,60 @@ QSettings *ConfigManager::readSettings(bool reread)
 			}
 	}
 
-	//user macros
-	if (!reread) {
-		if (config->value("Macros/0").isValid()) {
-			for (int i = 0; i < 1000; i++) {
-				QStringList ls = config->value(QString("Macros/%1").arg(i)).toStringList();
-				if (ls.isEmpty()) break;
-				completerConfig->userMacros.append(Macro(ls));
-			}
-			for (int i = 0; i < keyReplace.size(); i++) {
-				completerConfig->userMacros.append(Macro(
-				                                       tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("before word")),
-				                                       keyReplaceBeforeWord[i].replace("%", "%%"),
-				                                       "",
-				                                       "(?language:latex)(?<=\\s|^)" + QRegExp::escape(keyReplace[i])
-				                                   ));
-				completerConfig->userMacros.append(Macro(
-				                                       tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("after word")),
-				                                       keyReplaceAfterWord[i].replace("%", "%%"),
-				                                       "",
-				                                       "(?language:latex)(?<=\\S)" + QRegExp::escape(keyReplace[i])
-				                                   ));
-			}
-		} else {
-			// try importing old macros
-			QStringList userTags = config->value("User/Tags").toStringList();
-			QStringList userNames = config->value("User/TagNames").toStringList();
-			QStringList userAbbrevs = config->value("User/TagAbbrevs").toStringList();
-			QStringList userTriggers = config->value("User/TagTriggers").toStringList();
+//	//user macros
+//	if (!reread) {
+//		if (config->value("Macros/0").isValid()) {
+//			for (int i = 0; i < 1000; i++) {
+//				QStringList ls = config->value(QString("Macros/%1").arg(i)).toStringList();
+//				if (ls.isEmpty()) break;
+//				completerConfig->userMacros.append(Macro(ls));
+//			}
+//			for (int i = 0; i < keyReplace.size(); i++) {
+//				completerConfig->userMacros.append(Macro(
+//				                                       tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("before word")),
+//				                                       keyReplaceBeforeWord[i].replace("%", "%%"),
+//				                                       "",
+//				                                       "(?language:latex)(?<=\\s|^)" + QRegExp::escape(keyReplace[i])
+//				                                   ));
+//				completerConfig->userMacros.append(Macro(
+//				                                       tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("after word")),
+//				                                       keyReplaceAfterWord[i].replace("%", "%%"),
+//				                                       "",
+//				                                       "(?language:latex)(?<=\\S)" + QRegExp::escape(keyReplace[i])
+//				                                   ));
+//			}
+//		} else {
+//			// try importing old macros
+//			QStringList userTags = config->value("User/Tags").toStringList();
+//			QStringList userNames = config->value("User/TagNames").toStringList();
+//			QStringList userAbbrevs = config->value("User/TagAbbrevs").toStringList();
+//			QStringList userTriggers = config->value("User/TagTriggers").toStringList();
 
-			while (userTriggers.size() < userTags.size()) userTriggers << "";
+//			while (userTriggers.size() < userTags.size()) userTriggers << "";
 
-			for (int i = 0; i < keyReplace.size(); i++) {
-				userNames.append(tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("before word")));
-				userTags.append(keyReplaceBeforeWord[i].replace("%", "%%"));
-				userAbbrevs.append("");
-				userTriggers.append("(?language:latex)(?<=\\s|^)" + QRegExp::escape(keyReplace[i]));
+//			for (int i = 0; i < keyReplace.size(); i++) {
+//				userNames.append(tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("before word")));
+//				userTags.append(keyReplaceBeforeWord[i].replace("%", "%%"));
+//				userAbbrevs.append("");
+//				userTriggers.append("(?language:latex)(?<=\\s|^)" + QRegExp::escape(keyReplace[i]));
 
-				userNames.append(tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("after word")));
-				userTags.append(keyReplaceAfterWord[i].replace("%", "%%"));
-				userAbbrevs.append("");
-				userTriggers.append("(?language:latex)(?<=\\S)" + QRegExp::escape(keyReplace[i]));
-			}
+//				userNames.append(tr("Key replacement: %1 %2").arg(keyReplace[i]).arg(tr("after word")));
+//				userTags.append(keyReplaceAfterWord[i].replace("%", "%%"));
+//				userAbbrevs.append("");
+//				userTriggers.append("(?language:latex)(?<=\\S)" + QRegExp::escape(keyReplace[i]));
+//			}
 
-			for (int i = 0; i < userTags.size(); i++)
-				completerConfig->userMacros.append(Macro(userNames.value(i, ""), userTags[i], userAbbrevs.value(i, ""), userTriggers.value(i, "")));
-		}
-		// import old svn setting
-		if (config->contains("Tools/Auto Checkin after Save")) {
-			bool oldSetting = config->value("Tools/Auto Checkin after Save", false).toBool();
-			if (oldSetting)
-				autoCheckinAfterSaveLevel = 1;
-			config->remove("Tools/Auto Checkin after Save");
-		}
-	}
+//			for (int i = 0; i < userTags.size(); i++)
+//				completerConfig->userMacros.append(Macro(userNames.value(i, ""), userTags[i], userAbbrevs.value(i, ""), userTriggers.value(i, "")));
+//		}
+//		// import old svn setting
+//		if (config->contains("Tools/Auto Checkin after Save")) {
+//			bool oldSetting = config->value("Tools/Auto Checkin after Save", false).toBool();
+//			if (oldSetting)
+//				autoCheckinAfterSaveLevel = 1;
+//			config->remove("Tools/Auto Checkin after Save");
+//		}
+//	}
 	//menu shortcuts
 	QMap<QString, QString> aliases = QMap<QString, QString>();
 	// key and value may be a full command or a prefix only
@@ -1335,16 +1340,16 @@ QSettings *ConfigManager::saveSettings(const QString &saveName)
 	config->setValue("User/New Key Replacements Created", true);
 
 	//user macros
-	int index = 0;
-	foreach (const Macro &macro, completerConfig->userMacros) {
-		if (macro.name == TXS_AUTO_REPLACE_QUOTE_OPEN || macro.name == TXS_AUTO_REPLACE_QUOTE_CLOSE || macro.document)
-			continue;
-		config->setValue(QString("Macros/%1").arg(index++), macro.toStringList());
-	}
-	while (config->contains(QString("Macros/%1").arg(index))) { //remove old macros which are not used any more
-		config->remove(QString("Macros/%1").arg(index));
-		index++;
-	}
+//	int index = 0;
+//	foreach (const Macro &macro, completerConfig->userMacros) {
+//		if (macro.name == TXS_AUTO_REPLACE_QUOTE_OPEN || macro.name == TXS_AUTO_REPLACE_QUOTE_CLOSE || macro.document)
+//			continue;
+//		config->setValue(QString("Macros/%1").arg(index++), macro.toStringList());
+//	}
+//	while (config->contains(QString("Macros/%1").arg(index))) { //remove old macros which are not used any more
+//		config->remove(QString("Macros/%1").arg(index));
+//		index++;
+//	}
 
 	// remove old Tags
 	config->remove("User/Tags");
